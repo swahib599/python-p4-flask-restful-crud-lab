@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 
-from flask import Flask, jsonify, request, make_response
+from flask import Flask, jsonify, request, make_response, abort
 from flask_migrate import Migrate
 from flask_restful import Api, Resource
-
 from models import db, Plant
 
 app = Flask(__name__)
@@ -18,7 +17,6 @@ api = Api(app)
 
 
 class Plants(Resource):
-
     def get(self):
         plants = [plant.to_dict() for plant in Plant.query.all()]
         return make_response(jsonify(plants), 200)
@@ -38,16 +36,49 @@ class Plants(Resource):
         return make_response(new_plant.to_dict(), 201)
 
 
-api.add_resource(Plants, '/plants')
-
-
 class PlantByID(Resource):
-
     def get(self, id):
-        plant = Plant.query.filter_by(id=id).first().to_dict()
-        return make_response(jsonify(plant), 200)
+        plant = db.session.get(Plant, id)  # Updated to use db.session.get()
+        if not plant:
+            abort(404, description="Plant not found")
+        return make_response(jsonify(plant.to_dict()), 200)
+
+    def patch(self, id):
+        plant = db.session.get(Plant, id)  # Updated to use db.session.get()
+        if not plant:
+            abort(404, description="Plant not found")
+
+        # Get the data from the request
+        data = request.get_json()
+
+        # Update fields if they are present in the request body
+        if 'name' in data:
+            plant.name = data['name']
+        if 'image' in data:
+            plant.image = data['image']
+        if 'price' in data:
+            plant.price = data['price']
+        if 'is_in_stock' in data:
+            plant.is_in_stock = data['is_in_stock']
+
+        db.session.commit()
+
+        return make_response(jsonify(plant.to_dict()), 200)
+
+    def delete(self, id):
+        plant = db.session.get(Plant, id)  # Updated to use db.session.get()
+        if not plant:
+            abort(404, description="Plant not found")
+
+        db.session.delete(plant)
+        db.session.commit()
+
+        # Return an empty string and 204 No Content status
+        return ('', 204)
 
 
+# Add resources to the API
+api.add_resource(Plants, '/plants')
 api.add_resource(PlantByID, '/plants/<int:id>')
 
 
